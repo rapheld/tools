@@ -1,0 +1,62 @@
+#!/usr/local/bin/bash
+
+usage () {
+  echo 'usage: misajour [-h]'
+  echo 'Run misajour from a git repo to automatically update'
+  echo 'and rebase the master branch onto the current branch'
+}
+
+if [ "$1" == -h ] ; then
+  usage
+  exit 0
+fi
+
+(git rev-parse --git-dir >/dev/null 2>&1)
+
+if [ $? -ne 0 ] ; then
+  echo 'Not a git repository'
+  usage
+  exit 1
+fi
+
+function current_branch()
+{
+  echo $(git rev-parse --abbrev-ref HEAD)
+}
+
+target=$(current_branch)
+
+if [ "$target" == 'master' ]
+then
+  echo "Cannot `basename $0` the master branch"
+  echo "Please checkout a different one"
+  exit 1
+fi
+
+changes=$(git status --porcelain | wc -l)
+
+if [ $changes -gt 0 ]
+then
+  echo "Cannot misajour: You have unstaged changes"
+  echo "Please commit or stash them"
+  exit 1
+fi
+
+echo "Preparing to rebase master onto" $target
+git checkout master
+
+echo "Updating master..."
+git pull -q --rebase
+git checkout $target
+
+if [ $target == $(current_branch) ]
+then
+  echo "Rebasing master onto" $target"..."
+  git rebase master
+else
+  echo "Aborting: unable to switch back to" $target
+  echo "There was a problem updating master"
+fi
+
+exit $?
+
